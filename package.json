@@ -1,5 +1,5 @@
 {
-  "name": "Aframe-Material",
+  "name": "aframe-material-snickell",
   "main": "dist/aframe-material.min.js",
   "description": "Material design (inputs, keyboards, checkbox, radio button) for A-Frame (https://aframe.io).",
   "version": "0.1.1",
