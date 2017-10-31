@@ -219,13 +219,17 @@
 	var Draw = __webpack_require__(8);
 	var Behaviors = __webpack_require__(11);
 	var SFX = __webpack_require__(12);
+	var Event = __webpack_require__(4);
 	
 	AFRAME.registerComponent('keyboard', {
 	  schema: {
-	    isOpen: { type: "boolean", default: false }
+	    isOpen: { type: "boolean", default: false },
+	    physicalKeyboard: { type: "boolean", default: false }
 	  },
 	  currentInput: null,
 	  init: function init() {
+	    var that = this;
+	
 	    // Assets
 	    Utils.preloadAssets(Assets);
 	
@@ -235,13 +239,16 @@
 	    // Draw
 	    Draw.init(this.el);
 	
+	    // Init keyboard UI
 	    var numericalUI = Draw.numericalUI(),
 	        mainUI = Draw.mainUI(),
 	        actionsUI = Draw.actionsUI();
 	
+	    // Create layout
 	    this.el.alphabeticalLayout = Draw.alphabeticalLayout();
 	    this.el.symbolsLayout = Draw.symbolsLayout();
 	
+	    // Append layouts to UI
 	    numericalUI.appendChild(Draw.numericalLayout());
 	    mainUI.appendChild(this.el.alphabeticalLayout);
 	    actionsUI.appendChild(Draw.actionsLayout());
@@ -267,39 +274,20 @@
 	      Behaviors.destroyKeyboard(that.el);
 	    };
 	
+	    // Set default value
 	    this.el.setAttribute("scale", "2 2 2");
 	    this.el.setAttribute("rotation", "-20 0 0");
 	    this.el.setAttribute("position", "-1.5 -0.3 -2");
 	
-	    var that = this;
-	    this.el.addEventListener('input', function (e) {
-	      if (that.currentInput) {
-	        that.currentInput.appendString(e.detail);
-	      }
-	    });
-	    this.el.addEventListener('backspace', function (e) {
-	      if (that.currentInput) {
-	        that.currentInput.deleteLast();
-	      }
-	    });
-	    this.el.addEventListener('dismiss', function (e) {
-	      if (that.currentInput) {
-	        that.currentInput.blur();
-	      }
-	    });
-	    document.body.addEventListener('didfocusinput', function (e) {
-	      if (that.currentInput) {
-	        that.currentInput.blur(true);
-	      }
-	      that.currentInput = e.detail;
-	      if (!that.el.isOpen) {
-	        Behaviors.openKeyboard(that.el);
-	      }
-	    });
-	    document.body.addEventListener('didblurinput', function (e) {
-	      that.currentInput = null;
-	      Behaviors.dismissKeyboard(that.el);
-	    });
+	    // Register keyboard events
+	    this.el.addEventListener('input', this.inputEvent.bind(this));
+	    this.el.addEventListener('backspace', this.backspaceEvent.bind(this));
+	    this.el.addEventListener('dismiss', this.dismissEvent.bind(this));
+	
+	    // Register global events
+	    document.addEventListener('keydown', this.keydownEvent.bind(this));
+	    document.body.addEventListener('didfocusinput', this.didFocusInputEvent.bind(this));
+	    document.body.addEventListener('didblurinput', this.didBlurInputEvent.bind(this));
 	  },
 	  update: function update() {
 	    if (this.data.isOpen) {
@@ -309,9 +297,73 @@
 	    }
 	  },
 	  tick: function tick() {},
-	  remove: function remove() {},
+	  remove: function remove() {
+	    this.el.removeEventListener('input', this.inputEvent.bind(this));
+	    this.el.removeEventListener('backspace', this.backspaceEvent.bind(this));
+	    this.el.removeEventListener('dismiss', this.dismissEvent.bind(this));
+	
+	    document.removeEventListener('keydown', this.keydownEvent.bind(this));
+	    document.body.removeEventListener('didfocusinput', this.didFocusInputEvent.bind(this));
+	    document.body.removeEventListener('didblurinput', this.didBlurInputEvent.bind(this));
+	  },
 	  pause: function pause() {},
-	  play: function play() {}
+	  play: function play() {},
+	
+	  // Fired on keyboard key press
+	  inputEvent: function inputEvent(e) {
+	    if (this.currentInput) {
+	      this.currentInput.appendString(e.detail);
+	    }
+	  },
+	
+	  // Fired on backspace key press
+	  backspaceEvent: function backspaceEvent(e) {
+	    if (this.currentInput) {
+	      this.currentInput.deleteLast();
+	    }
+	  },
+	
+	  dismissEvent: function dismissEvent(e) {
+	    if (this.currentInput) {
+	      this.currentInput.blur();
+	    }
+	  },
+	
+	  // physical keyboard event
+	  keydownEvent: function keydownEvent(e) {
+	    if (this.currentInput && this.data.physicalKeyboard) {
+	      e.preventDefault();
+	      e.stopPropagation();
+	
+	      if (e.key === 'Enter') {
+	        Event.emit(Behaviors.el, 'input', '\n');
+	        Event.emit(Behaviors.el, 'enter', '\n');
+	      } else if (e.key === 'Backspace') {
+	        Event.emit(Behaviors.el, 'backspace');
+	      } else if (e.key === 'Escape') {
+	        Event.emit(Behaviors.el, 'dismiss');
+	      } else if (e.key.length < 2) {
+	        Event.emit(Behaviors.el, 'input', e.key);
+	      }
+	    }
+	  },
+	
+	  // Fired when an input has been selected
+	  didFocusInputEvent: function didFocusInputEvent(e) {
+	    if (this.currentInput) {
+	      this.currentInput.blur(true);
+	    }
+	    this.currentInput = e.detail;
+	    if (!this.el.isOpen) {
+	      Behaviors.openKeyboard(this.el);
+	    }
+	  },
+	
+	  // Fired when an input has been deselected
+	  didBlurInputEvent: function didBlurInputEvent(e) {
+	    this.currentInput = null;
+	    Behaviors.dismissKeyboard(this.el);
+	  }
 	});
 	
 	AFRAME.registerPrimitive('a-keyboard', {
@@ -319,7 +371,8 @@
 	    keyboard: {}
 	  },
 	  mappings: {
-	    'is-open': 'keyboard.isOpen'
+	    'is-open': 'keyboard.isOpen',
+	    'physical-keyboard': 'keyboard.physicalKeyboard'
 	  }
 	});
 
@@ -386,6 +439,7 @@
 	        var asset_item = document.createElement(item.type);
 	        asset_item.setAttribute('id', item.id);
 	        asset_item.setAttribute('src', item.src);
+	        asset_item.setAttribute('crossorigin', 'anonymous');
 	        assets.appendChild(asset_item);
 	      }
 	    }
@@ -1191,6 +1245,7 @@
 	    Event.emit(Behaviors.el, 'backspace');
 	  } else if (type === 'enter') {
 	    Event.emit(Behaviors.el, 'input', '\n');
+	    Event.emit(Behaviors.el, 'enter', '\n');
 	  } else if (type === 'dismiss') {
 	    Event.emit(Behaviors.el, 'dismiss');
 	  }
@@ -2303,7 +2358,8 @@
 	      if (this.components.checkbox.data.disabled) {
 	        return;
 	      }
-	      this.setAttribute('checked', !this.components.checkbox.data.checked);
+	      this.components.checkbox.data.checked = !this.components.checkbox.data.checked;
+	      this.setAttribute('checked', this.components.checkbox.data.checked);
 	      that.onClick();
 	    });
 	    this.el.addEventListener('mousedown', function () {
