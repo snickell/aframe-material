@@ -26,6 +26,7 @@ Utils.preloadAssets = (assets_arr)=>{
       var asset_item = document.createElement(item.type);
       asset_item.setAttribute('id', item.id);
       asset_item.setAttribute('src', item.src);
+      asset_item.setAttribute('crossorigin', 'anonymous');
       assets.appendChild(asset_item);
     }
   }
